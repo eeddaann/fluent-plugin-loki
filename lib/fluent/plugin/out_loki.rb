@@ -17,14 +17,14 @@ class Fluent::Plugin::LokiOutput < Fluent::Plugin::Output
   # Loki's endpoint URL ex. http://localhost:3100
   config_param :endpoint_url, :string
 
+  # Loki tenant id
+  config_param :tenant, :string, :default => nil
+
+  # labels
+  config_param :labels, :hash, :default => nil
+
   # Set Net::HTTP.verify_mode to `OpenSSL::SSL::VERIFY_NONE`
   config_param :ssl_no_verify, :bool, :default => false
-
-  # HTTP method
-  config_param :http_method, :enum, list: [:get, :put, :post, :delete], :default => :post # TODO: remove and set post
-
-  # form | json
-  config_param :serializer, :enum, list: [:json, :form, :text], :default => :form
 
   # Simple rate limiting: ignore any records within `rate_limit_msec`
   # since the last one.
@@ -38,9 +38,6 @@ class Fluent::Plugin::LokiOutput < Fluent::Plugin::Output
 
   # custom headers
   config_param :custom_headers, :hash, :default => nil
-
-  # labels
-  config_param :labels, :hash, :default => nil
 
   # 'none' | 'basic' | 'jwt' | 'bearer'
   config_param :authentication, :enum, list: [:none, :basic, :jwt, :bearer],  :default => :none
@@ -83,17 +80,14 @@ class Fluent::Plugin::LokiOutput < Fluent::Plugin::Output
   end
 
   def set_body(req, tag, time, record)
-    if @serializer == :json
-      set_json_body(req, record)
-    elsif @serializer == :text
-      set_text_body(req, record)
-    else
-      req.set_form_data(record)
-    end
+    set_json_body(req, record)
     req
   end
 
   def set_header(req, tag, time, record)
+    if @tenant
+      req["X-Scope-OrgID"] = @tenant
+    end
     if @custom_headers
       @custom_headers.each do |k,v|
         req[k] = v
@@ -109,15 +103,10 @@ class Fluent::Plugin::LokiOutput < Fluent::Plugin::Output
     req['Content-Type'] = 'application/json'
   end
 
-  def set_text_body(req, data)
-    req.body = data["message"]
-    req['Content-Type'] = 'text/plain'
-  end
-
   def create_request(tag, time, record)
     url = format_url(tag, time, record)
-    uri = URI.parse(url)
-    req = Net::HTTP.const_get(@http_method.to_s.capitalize).new(uri.request_uri) # TODO: set to post
+    uri = URI.parse(url+"/api/prom/push")
+    req = Net::HTTP::Post.new(uri.request_uri)
     set_body(req, tag, time, record)
     set_header(req, tag, time, record)
     return req, uri
@@ -189,14 +178,9 @@ class Fluent::Plugin::LokiOutput < Fluent::Plugin::Output
     return st
   end
   def handle_record(tag, time, record)
-    rec = {"streams"=>[{"labels"=>format_labels(@labels), "entries"=>[{"ts"=>Time.now.iso8601(3), "line"=>"baz"}]}]}
-    #rec = {"streams"=>[{"labels"=>"{foo=\"bar\",env=\"test\"}", "entries"=>[{"ts"=>Time.now.iso8601(3), "line"=>"baz"}]}]}
+    rec = {"streams"=>[{"labels"=>format_labels(@labels), "entries"=>[{"ts"=>Time.now.iso8601(3), "line"=>record.to_s}]}]}
+    # I used time now instead of at 'time' because it cause 'Entry out of order' on loki's side
     req, uri = create_request(tag, time, rec)
-    #log.warn "pre #{record}"
-    #log.warn "json: #{JSON['{ "streams": [ { "labels": "{foo=\"baz\"}", "entries": [ {"ts": "2018-12-30T01:28:06.801065-04:00", "line": "baz"} ] } ] }']}"
-    #rec = {:foo => 12425125, :bar => "some string", ... }
-    #{ "streams": [ { "labels": "{foo=\"baz\"}", "entries": [ {"ts": "2018-12-30T01:28:06.801065-04:00", "line": "baz"} ] } ] }
-    log.warn "#{Time.now.iso8601(3)}"
     send_request(req, uri)
   end
 
