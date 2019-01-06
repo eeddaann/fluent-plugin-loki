@@ -5,7 +5,13 @@
 - Can be used to ship docker logs to Loki (using [Fluentd docker logging driver](https://docs.docker.com/config/containers/logging/fluentd/))
 - Enable easier transtion to Loki - an alternative to Loki's Promtail 
 
-**Under devlopment!!**
+## Installation
+
+### RubyGems
+
+```
+$ gem install fluent-plugin-loki
+```
 
 ## Configuration
 sample configuration:

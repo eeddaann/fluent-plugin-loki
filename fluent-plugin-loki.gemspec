@@ -2,7 +2,7 @@
 
 Gem::Specification.new do |gem|
     gem.name          = "fluent-plugin-loki"
-    gem.version       = "0.1.0"
+    gem.version       = "0.2.0"
     gem.authors       = ["Edan Shahmoon"]
     gem.email         = ["edan100@gmail.com"]
     gem.summary       = %q{A Fluentd output plugin to send logs to Grafana Loki}
