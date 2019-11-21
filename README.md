@@ -17,7 +17,7 @@ $ gem install fluent-plugin-loki
 sample configuration:
 ```
 <match *>
-  @type http
+  @type loki
   endpoint_url    http://127.0.0.1:3100
   labels          {"env":"prod","farm":"a"} # default: nil
   tenant          abcd           # default: nil
