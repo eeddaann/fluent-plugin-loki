@@ -1,6 +1,7 @@
 require 'net/http'
 require 'uri'
 require 'yajl'
+require 'json'
 require 'fluent/plugin/output'
 
 class Fluent::Plugin::LokiOutput < Fluent::Plugin::Output
@@ -47,6 +48,9 @@ class Fluent::Plugin::LokiOutput < Fluent::Plugin::Output
   # Switch non-buffered/buffered plugin
   config_param :buffered, :bool, :default => false
 
+  # Support multiple JSON encoders
+  config_param :encoder, :enum, list: [:yajl, :json], default: :yajl
+
   config_section :buffer do
     config_set_default :@type, DEFAULT_BUFFER_TYPE
     config_set_default :chunk_keys, ['tag']
@@ -56,12 +60,18 @@ class Fluent::Plugin::LokiOutput < Fluent::Plugin::Output
     compat_parameters_convert(conf, :buffer)
     super
 
+    @encoder = case @encoder
+                 when :yajl
+                   Yajl
+                 when :json
+                   JSON
+                 end
+
     @ssl_verify_mode = if @ssl_no_verify
                          OpenSSL::SSL::VERIFY_NONE
                        else
                          OpenSSL::SSL::VERIFY_PEER
                        end
-
     @ca_file = @cacert_file
     @last_request_time = nil
     raise Fluent::ConfigError, "'tag' in chunk_keys is required." if !@chunk_key_tag && @buffered
@@ -99,7 +109,7 @@ class Fluent::Plugin::LokiOutput < Fluent::Plugin::Output
   end
 
   def set_json_body(req, data)
-    req.body = Yajl.dump(data)
+    req.body = @encoder.dump(data)
     req['Content-Type'] = 'application/json'
   end
 
