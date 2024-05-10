@@ -115,7 +115,7 @@ class Fluent::Plugin::LokiOutput < Fluent::Plugin::Output
 
   def create_request(tag, time, record)
     url = format_url(tag, time, record)
-    uri = URI.parse(url+"/api/prom/push")
+    uri = URI.parse(url+"/loki/api/v1/push")
     req = Net::HTTP::Post.new(uri.request_uri)
     set_body(req, tag, time, record)
     set_header(req, tag, time, record)
